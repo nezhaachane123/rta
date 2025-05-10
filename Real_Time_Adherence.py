@@ -745,11 +745,11 @@ st.markdown(f"""
 nav_cols = st.columns(3)
 with nav_cols[0]:
     if st.button("📊 Dashboard"):
-        st.switch_page("pages/Dashboard.py")
+        st.switch_page("Dashboard.py")
 
 with nav_cols[1]:
     if st.session_state.role == "admin" and st.button("👑 Administration"):
-        st.switch_page("pages/Admin.py")
+        st.switch_page("Admin.py")
 
 with nav_cols[2]:
     if st.button("🚪 Déconnexion"):
