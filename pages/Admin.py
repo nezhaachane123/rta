@@ -201,9 +201,6 @@
 
 
 
-
-
-
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -435,7 +432,7 @@ with col3:
 st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #e0e0e0;">', unsafe_allow_html=True)
 
 # Fonction pour se connecter à Google Sheets
-ef connect_to_sheets():
+def connect_to_sheets():
     scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive"
@@ -454,6 +451,7 @@ with st.spinner("Chargement des données..."):
     sheet1 = spreadsheet.sheet1
     data = sheet1.get_all_records()
   
+
 # Tableau de bord d'administration
 st.markdown("""
 <div class="card">
@@ -574,7 +572,7 @@ with user_tabs[0]:
                 # Trouver l'index de l'utilisateur dans la feuille
                 for i, row in enumerate(data, start=2):  # Google Sheets commence à 1 + en-tête
                     if row['username'] == username_to_delete:
-                        sheet.delete_rows(i)
+                        sheet1.delete_rows(i)
                         st.success(f"✅ Utilisateur '{username_to_delete}' supprimé avec succès!")
                         st.rerun()  # Recharger la page
                         break
@@ -618,7 +616,7 @@ with user_tabs[1]:
                     # Ajouter le nouvel utilisateur
                     try:
                         new_row = [new_username, new_password, new_role]
-                        sheet.append_row(new_row)
+                        sheet1.append_row(new_row)
                         st.success(f"✅ Utilisateur '{new_username}' ajouté avec succès!")
                         st.rerun()  # Recharger la page
                     except Exception as e:
@@ -692,7 +690,7 @@ with user_tabs[2]:
                                 row_data.append(new_role)
                                 
                                 # Mettre à jour la ligne
-                                sheet.update(f'A{i}:C{i}', [row_data])
+                                sheet1.update(f'A{i}:C{i}', [row_data])
                                 st.success("✅ Utilisateur mis à jour avec succès!")
                                 st.rerun()
                                 break
