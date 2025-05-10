@@ -189,7 +189,7 @@ if st.session_state.logged_in:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("📊 Tableau de bord"):
-            st.switch_page("Dashboard.py")
+            st.switch_page("pages/Dashboard.py")
     
     # N'afficher le bouton Admin que pour les admins
     with col2:
@@ -198,7 +198,7 @@ if st.session_state.logged_in:
                 st.switch_page("pages/Admin.py")
         else:
             if st.button("📈 Real Time Adherence"):
-                st.switch_page("Real_Time_Adherence.py")
+                st.switch_page("pages/Real_Time_Adherence.py")
     
     # Bouton de déconnexion
     if st.button("🚪 Déconnexion"):
@@ -235,7 +235,7 @@ else:
                 if role == "admin":
                     st.switch_page("pages/Admin.py")
                 else:
-                    st.switch_page("Dashboard.py")
+                    st.switch_page("pages/Dashboard.py")
             else:
                 st.error("Nom d'utilisateur ou mot de passe incorrect")
 
