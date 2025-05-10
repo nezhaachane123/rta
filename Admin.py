@@ -435,8 +435,12 @@ with col3:
 st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #e0e0e0;">', unsafe_allow_html=True)
 
 # Fonction pour se connecter à Google Sheets
-def connect_to_sheets():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+ef connect_to_sheets():
+    scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        # Utiliser les credentials pour la feuille users
     creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
     client = gspread.authorize(creds)
     return client
@@ -444,10 +448,12 @@ def connect_to_sheets():
 # Connexion à Google Sheets et récupération des données
 with st.spinner("Chargement des données..."):
     client = connect_to_sheets()
-    spreadsheet_id = "1Pk0p-lsFHUPUq8MUWcSNEQFPCFgl-C8TH73i76zqjbE"
-    sheet = client.open_by_key(spreadsheet_id).sheet1
-    data = sheet.get_all_records()
-
+      # Ouvrir le classeur Google Sheets "users"
+    spreadsheet = client.open("users_data")  # Remplacez "users" par le nom exact de votre feuille de calcul
+    # Récupérer la première feuille
+    sheet1 = spreadsheet.sheet1
+    data = sheet1.get_all_records()
+  
 # Tableau de bord d'administration
 st.markdown("""
 <div class="card">
