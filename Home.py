@@ -1,94 +1,5 @@
 
 # ######################################code final 
-# import streamlit as st
-# import gspread
-# from oauth2client.service_account import ServiceAccountCredentials
-
-# # Configuration de la page
-# st.set_page_config(
-#     page_title="Système de Connexion",
-#     page_icon="🏠",
-#     layout="centered"
-# )
-
-# # Initialisation des variables de session
-# if 'logged_in' not in st.session_state:
-#     st.session_state.logged_in = False
-# if 'username' not in st.session_state:
-#     st.session_state.username = ""
-# if 'role' not in st.session_state:
-#     st.session_state.role = ""
-
-# # Fonction pour vérifier les identifiants
-# def check_credentials(username, password):
-#     # Récupérer data depuis Google Sheets
-#     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-#     creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-#     client = gspread.authorize(creds)
-    
-#     spreadsheet_id = "1Pk0p-lsFHUPUq8MUWcSNEQFPCFgl-C8TH73i76zqjbE"
-#     sheet = client.open_by_key(spreadsheet_id).sheet1
-#     data = sheet.get_all_records()
-    
-#     # Vérifier les identifiants
-#     for row in data:
-#         if row['username'] == username and row['password'] == password:
-#             return True, row['role']
-#     return False, None
-
-# # Interface principale
-# st.title("🔐 Connexion")
-
-# # Si déjà connecté, afficher un message et proposer d'aller au dashboard
-# if st.session_state.logged_in:
-#     st.success(f"Bienvenue dans notre application {st.session_state.username}")
-    
-#     col1, col2 = st.columns(2)
-#     with col1:
-#         if st.button("Aller au Dashboard"):
-#             st.switch_page("pages/Dashboard.py")
-    
-#     # N'afficher le bouton Admin que pour les admins
-#     with col2:
-#         if st.session_state.role == "admin":
-#             if st.button("Aller à l'Administration"):
-#                 st.switch_page("pages/Admin.py")
-    
-#     # Bouton de déconnexion
-#     if st.button("Déconnexion"):
-#         st.session_state.logged_in = False
-#         st.session_state.username = ""
-#         st.session_state.role = ""
-#         st.rerun()
-# else:
-#     # Formulaire de connexion
-#     with st.form("login_form"):
-#         username = st.text_input("Nom d'utilisateur")
-#         password = st.text_input("Mot de passe", type="password")
-#         submit = st.form_submit_button("Se connecter")
-        
-#         if submit:
-#             authenticated, role = check_credentials(username, password)
-#             if authenticated:
-#                 # Enregistrer dans la session
-#                 st.session_state.logged_in = True
-#                 st.session_state.username = username
-#                 st.session_state.role = role
-                
-#                 # Message de réussite
-#                 st.success(f"Connexion réussie !")
-                
-#                 # Rediriger automatiquement selon le rôle
-#                 if role == "admin":
-#                     # st.info("Redirection vers le tableau de bord administrateur...")
-#                     st.switch_page("pages/Admin.py")
-#                 else:
-#                     # st.info("Redirection vers le tableau de bord utilisateur...")
-#                     st.switch_page("pages/Dashboard.py")
-#             else:
-#                 st.error("Nom d'utilisateur ou mot de passe incorrect")
-
-
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -234,14 +145,21 @@ if 'role' not in st.session_state:
 
 # Fonction pour vérifier les identifiants
 def check_credentials(username, password):
-    # Récupérer data depuis Google Sheets
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+
+        # Utiliser les credentials pour la feuille users
     creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
     client = gspread.authorize(creds)
-    
-    spreadsheet_id = "1Pk0p-lsFHUPUq8MUWcSNEQFPCFgl-C8TH73i76zqjbE"
-    sheet = client.open_by_key(spreadsheet_id).sheet1
-    data = sheet.get_all_records()
+        
+        # Ouvrir le classeur Google Sheets "users"
+    spreadsheet = client.open("users_data")  # Remplacez "users" par le nom exact de votre feuille de calcul
+        
+        # Récupérer la première feuille
+    sheet1 = spreadsheet.sheet1
+    data = sheet1.get_all_records()
     
     # Vérifier les identifiants
     for row in data:
