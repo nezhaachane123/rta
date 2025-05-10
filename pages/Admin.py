@@ -418,11 +418,11 @@ st.markdown(f"""
 col1, col2, col3 = st.columns([1, 1, 1])
 with col1:
     if st.button("📊 Dashboard"):
-        st.switch_page("pages/Dashboard.py")
+        st.switch_page("Dashboard.py")
         
 with col2:
     if st.button("📈 Real Time Adherence"):
-        st.switch_page("pages/Real_Time_Adherence.py")
+        st.switch_page("Real_Time_Adherence.py")
         
 with col3:
     if st.button("🚪 Déconnexion"):
