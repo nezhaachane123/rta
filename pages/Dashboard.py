@@ -564,7 +564,6 @@
 
 
 
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -796,34 +795,55 @@ def load_data():
         # Ouvrir le classeur Google Sheets
         spreadsheet = client.open("mydata")
         
-        # Récupérer la première feuille
-        sheet1 = spreadsheet.sheet1
-        all_data1 = sheet1.get_all_records()
-        df1 = pd.DataFrame(all_data1)
+        # Récupérer toutes les feuilles du classeur
+        all_worksheets = spreadsheet.worksheets()
         
-        # Récupérer la deuxième feuille
-        sheet2 = spreadsheet.get_worksheet(1)
-        all_data2 = sheet2.get_all_records()
-        df2 = pd.DataFrame(all_data2)
+        # Liste pour stocker tous les DataFrames
+        all_dfs = []
         
-        # S'assurer que la colonne Date est au format datetime
-        if 'Date' in df1.columns:
-            df1['Date'] = pd.to_datetime(df1['Date'], format='%d/%m/%Y')
-        
-        if 'Date' in df2.columns:
-            df2['Date'] = pd.to_datetime(df2['Date'], format='%d/%m/%Y')
-        
-        # Conversion des durées
-        time_cols = ['Prod', 'Pause_planning', 'Lunch', 'Pause_realise', 'prod_realise']
-        for col in time_cols:
-            if col in df1.columns:
-                df1[col] = pd.to_timedelta(df1[col]).dt.total_seconds()
-            if col in df2.columns:
-                df2[col] = pd.to_timedelta(df2[col]).dt.total_seconds()
+        # Pour chaque feuille, récupérer les données
+        for worksheet in all_worksheets:
+            sheet_name = worksheet.title
+            
+            # Récupérer les données
+            all_data = worksheet.get_all_records()
+            
+            # Vérifier si la feuille contient des données
+            if all_data:
+                # Créer un DataFrame
+                df = pd.DataFrame(all_data)
                 
-        # Combinaison des dataframes
-        df_combined = pd.concat([df1, df2])
-        return df_combined
+                # Ajouter le nom de la feuille comme colonne pour identification
+                df['source_sheet'] = sheet_name
+                
+                # S'assurer que la colonne Date est au format datetime
+                if 'Date' in df.columns:
+                    try:
+                        df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+                    except:
+                        st.warning(f"Problème de conversion de date dans la feuille {sheet_name}")
+                
+                # Conversion des durées
+                time_cols = ['Prod', 'Pause_planning', 'Lunch', 'Pause_realise', 'prod_realise']
+                for col in time_cols:
+                    if col in df.columns:
+                        try:
+                            df[col] = pd.to_timedelta(df[col]).dt.total_seconds()
+                        except:
+                            # Si erreur, continuer sans bloquer
+                            pass
+                
+                # Ajouter le DataFrame à la liste
+                all_dfs.append(df)
+        
+        # Combiner tous les DataFrames
+        if all_dfs:
+            df_combined = pd.concat(all_dfs, ignore_index=True)
+            return df_combined
+        else:
+            st.warning("Aucune donnée n'a été trouvée dans les feuilles du classeur.")
+            return pd.DataFrame()
+            
     except Exception as e:
         st.error(f"Erreur lors du chargement des données : {e}")
         return pd.DataFrame()
@@ -1202,90 +1222,60 @@ else:
         graph_cols3 = st.columns(2)
         
         with graph_cols3[0]:
-            # Graphique 5: Adhérence moyenne et Temps de production par agent
+            # Graphique 3: Top 10 agents avec adhérence la plus faible
             st.markdown("---")
-            st.subheader("Adhérence et Production par Agent")
+            st.subheader("10 Agents - Adhérence la Plus Faible")
             
             # Préparation des données
-            agent_metrics = filtered_data.groupby('Nom Agent').agg({
-                'Adherence': lambda x: x.str.rstrip('%').astype(float).mean(),
-                'Prod': 'sum'
-            }).reset_index()
+            agent_adherence_df = agent_adherence.reset_index()
+            agent_adherence_df.columns = ['Nom Agent', 'Adhérence Moyenne']
             
-            agent_metrics['Prod (heures)'] = agent_metrics['Prod'] / 3600
-            agent_metrics = agent_metrics.sort_values('Adherence', ascending=False)
+            # Trier et prendre les 10 plus faibles (au lieu des 10 meilleurs)
+            bottom_agents = agent_adherence_df.sort_values('Adhérence Moyenne', ascending=True).head(10)
             
-            # Limiter à un nombre raisonnable d'agents pour lisibilité
-            if len(agent_metrics) > 15:
-                agent_metrics = agent_metrics.head(15)
-            
-            # Graphique à double axe y avec style amélioré
-            fig = go.Figure()
-            
-            # Adhérence
-            fig.add_trace(go.Scatter(
-                x=agent_metrics['Nom Agent'],
-                y=agent_metrics['Adherence'],
-                name='Adhérence Moyenne (%)',
-                mode='lines+markers',
-                line=dict(color='#4caf50', width=3),
-                marker=dict(size=10, color='#4caf50')
-            ))
-            
-            # Production
-            fig.add_trace(go.Scatter(
-                x=agent_metrics['Nom Agent'],
-                y=agent_metrics['Prod (heures)'],
-                name='Temps de Production (heures)',
-                mode='lines+markers',
-                line=dict(color='#1a73e8', width=3, dash='dash'),
-                marker=dict(size=10, color='#1a73e8'),
-                yaxis='y2'
-            ))
-            
-            # Ligne d'objectif
-            fig.add_hline(
-                y=90, 
-                line_dash="dot", 
-                line_color="#f44336",
-                annotation_text="Objectif 90%", 
-                annotation_position="top right"
+            # Graphique avec style amélioré et couleurs adaptées pour indiquer des scores faibles
+            fig = px.bar(
+                bottom_agents,
+                x='Adhérence Moyenne',
+                y='Nom Agent',
+                orientation='h',
+                text='Adhérence Moyenne',
+                color='Adhérence Moyenne',
+                # Palette de couleurs inversée pour indiquer les performances faibles
+                color_continuous_scale=[(0, '#f44336'), (0.5, '#ff9800'), (1, '#ffc107')]
             )
-            
-            # Configuration du layout
             fig.update_layout(
                 title=None,
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)',
                 font=dict(family="Poppins, sans-serif"),
-                margin=dict(l=10, r=10, t=10, b=50),
+                margin=dict(l=10, r=10, t=10, b=10),
                 xaxis=dict(
-                    title="Agent",
-                    tickangle=45,
+                    title="Adhérence Moyenne (%)",
+                    range=[0, 100],
                     gridcolor='rgba(211,211,211,0.3)'
                 ),
                 yaxis=dict(
-                    title="Adhérence Moyenne (%)",
-                    range=[0, 105],
-                    side="left",
-                    showgrid=True,
-                    gridcolor='rgba(211,211,211,0.3)'
+                    title=None,
+                    autorange="reversed"
                 ),
-                yaxis2=dict(
-                    title="Temps de Production (heures)",
-                    side="right",
-                    overlaying="y",
-                    showgrid=False
-                ),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="center",
-                    x=0.5
-                ),
-                height=500
+                coloraxis_showscale=False
             )
+            fig.update_traces(
+                texttemplate='%{text:.2f}%', 
+                textposition='outside',
+                marker_line_width=0
+            )
+            
+            # Ajout d'une ligne de seuil pour indiquer l'objectif de 90%
+            fig.add_vline(
+                x=90,
+                line_dash="dash", 
+                line_color="#4caf50",
+                annotation_text="Objectif 90%",
+                annotation_position="top"
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
