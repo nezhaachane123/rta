@@ -516,6 +516,8 @@
 
 
 
+
+
 import streamlit as st
 import gspread
 import pandas as pd
@@ -523,6 +525,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Configuration de la page
 st.set_page_config(
@@ -530,7 +534,25 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
+# The function I'm adding will convert time strings like "00:14:35" to seconds
+def time_to_seconds(time_str):
+    if not time_str or time_str == "":
+        return 0
+    try:
+        # Split the time string into hours, minutes, and seconds
+        hours, minutes, seconds = time_str.split(':')
+        # Convert to total seconds
+        total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+        return total_seconds
+    except:
+        return 0
 
+# The function to format seconds back to a readable time format (HH:MM:SS)
+def seconds_to_time(seconds):
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours:02d}h {minutes:02d}min {secs:02d}sec"
 # CSS personnalisé pour améliorer l'apparence
 st.markdown("""
 <style>
@@ -800,7 +822,6 @@ def load_data():
                 # Créer un DataFrame
                 df = pd.DataFrame(all_data)
                 
-                
                 # S'assurer que la colonne Date est au format datetime
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
@@ -867,6 +888,8 @@ if not df_combined.empty and 'Date' in df_combined.columns:
         selected_files = []
         selected_tlss = []
         selected_ops = []
+        min_adherence = 0
+        max_adherence = 100
     else:
         # Si une date est sélectionnée, filtrer les données et afficher les filtres
         selected_date_dt = pd.to_datetime(selected_date, format='%d/%m/%Y')
@@ -903,6 +926,47 @@ if not df_combined.empty and 'Date' in df_combined.columns:
             default=None,
             placeholder="Sélectionnez un ou plusieurs OPS"
         )
+        
+        # Séparateur pour le filtre d'adhérence
+        st.sidebar.markdown('<div class="sidebar-section-title">Filtre d\'Adhérence</div>', unsafe_allow_html=True)
+
+        # Créer deux colonnes pour les contrôles min/max
+        adh_cols = st.sidebar.columns(2)
+
+        # Définir les valeurs par défaut
+        default_min_adherence = 0
+        default_max_adherence = 100
+
+        # Créer les sliders pour le minimum et maximum d'adhérence
+        with adh_cols[0]:
+            min_adherence = st.number_input(
+                "Min (%)",
+                min_value=0,
+                max_value=100,
+                value=default_min_adherence,
+                step=5
+            )
+
+        with adh_cols[1]:
+            max_adherence = st.number_input(
+                "Max (%)",
+                min_value=0,
+                max_value=100,
+                value=default_max_adherence,
+                step=5
+            )
+
+        # Assurer que min <= max
+        if min_adherence > max_adherence:
+            min_adherence, max_adherence = max_adherence, min_adherence
+            st.sidebar.warning("Les valeurs min et max ont été inversées.")
+
+        # Afficher la plage sélectionnée
+        st.sidebar.markdown(f"""
+        <div style="padding: 10px; background-color: #f2f6ff; border-radius: 5px; text-align: center; margin-top: 10px;">
+            <span style="font-weight: 500;">Plage: {min_adherence}% - {max_adherence}%</span>
+        </div>
+        """, unsafe_allow_html=True)
 else:
     # Si pas de colonne Date ou dataframe vide
     st.error("⚠️ Aucune donnée n'a été chargée ou la colonne 'Date' est manquante.")
@@ -911,6 +975,8 @@ else:
     selected_files = []
     selected_tlss = []
     selected_ops = []
+    min_adherence = 0
+    max_adherence = 100
     df = pd.DataFrame()
 
 # Bouton de rafraîchissement
@@ -920,8 +986,9 @@ if st.sidebar.button("🔄 Rafraîchir les données"):
     st.cache_resource.clear()
     st.rerun()
 
-# Fonction de filtrage améliorée
-def apply_filters(data, files=None, tlss=None, ops=None):
+# Fonction de filtrage améliorée avec filtrage d'adhérence
+# Fonction de filtrage améliorée avec filtrage d'adhérence par agent
+def apply_filters(data, files=None, tlss=None, ops=None, min_adherence=0, max_adherence=100):
     filtered = data.copy()
     
     # Appliquer les filtres seulement si des options sont sélectionnées
@@ -932,12 +999,24 @@ def apply_filters(data, files=None, tlss=None, ops=None):
     if ops and len(ops) > 0:
         filtered = filtered[filtered['OPS'].isin(ops)]
     
+    # Filtrer par pourcentage d'adhérence MOYENNE PAR AGENT
+    if min_adherence > 0 or max_adherence < 100:
+        # Calculer l'adhérence moyenne par agent
+        agent_adherence = filtered.groupby('Nom Agent')['Adherence'].apply(
+            lambda x: x.str.rstrip('%').astype(float).mean()
+        )
+        
+        # Filtrer les agents dont l'adhérence moyenne est dans la plage spécifiée
+        agents_in_range = agent_adherence[
+            (agent_adherence >= min_adherence) & 
+            (agent_adherence <= max_adherence)
+        ].index.tolist()
+        
+        # Appliquer le filtre sur les données
+        filtered = filtered[filtered['Nom Agent'].isin(agents_in_range)]
+    
     return filtered
-
 # Fonction pour créer les graphiques avec style amélioré
-# Fonction pour créer les graphiques avec style amélioré
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 def create_agent_plot(agent_df):
     # Palette de couleurs
     prod_color = "#1a73e8"     # Bleu principal
@@ -945,6 +1024,7 @@ def create_agent_plot(agent_df):
     lunch_color = "#ff9800"    # Orange
     adherence_high = "#4caf50" # Vert
     adherence_low = "#f44336"  # Rouge
+    deconnexion_color = "#d32f2f"  # Rouge foncé pour la déconnexion
     
     # Créer une figure Plotly avec 3 sous-graphiques
     fig = make_subplots(rows=3, cols=1, 
@@ -1010,25 +1090,11 @@ def create_agent_plot(agent_df):
             'tranche': tranche
         })
         
-        # RÉALISÉ
-        if row['Pause_realise'] > row['prod_realise']:
-            color = pause_color
-            activity = "Pause"
-        elif row['prod_realise'] > row['Pause_realise']:
-            color = prod_color
-            activity = "Production"
-        elif row['Pause_realise'] == 0 and row['prod_realise'] == 0:
-            color = lunch_color
-            activity = "Déjeuner"
-        else:
-            color = "#F7F7F7"
-            activity = "Non défini"
-        
+        # RÉALISÉ - Simplifié pour ne stocker que les positions et la tranche
+        # Nous n'avons plus besoin de déterminer une couleur dominante ici
         real_data.append({
             'x0': x_start, 
             'x1': x_end, 
-            'color': color,
-            'activity': activity,
             'tranche': tranche
         })
         
@@ -1072,30 +1138,163 @@ def create_agent_plot(agent_df):
             row=1, col=1
         )
     
-    # Ajouter les rectangles pour RÉALISÉ
-    for segment in real_data:
-        fig.add_shape(
-            type="rect",
-            x0=segment['x0'], y0=0,
-            x1=segment['x1'], y1=1,
-            fillcolor=segment['color'],
-            line=dict(width=0),
-            opacity=0.9,
-            row=2, col=1
-        )
-        # Ajouter des données invisibles pour les tooltips
-        fig.add_trace(
-            go.Scatter(
-                x=[(segment['x0'] + segment['x1']) / 2],
-                y=[0.5],
-                mode="markers",
-                marker=dict(size=0, color="rgba(0,0,0,0)"),
-                hoverinfo="text",
-                text=f"Tranche: {segment['tranche']}<br>Activité: {segment['activity']}",
-                showlegend=False
-            ),
-            row=2, col=1
-        )
+    # Ajouter les rectangles pour RÉALISÉ (VERSION DÉTAILLÉE)
+    for i, segment in enumerate(real_data):
+        x0 = segment['x0']
+        x1 = segment['x1']
+        tranche = segment['tranche']
+        
+        # Récupérer les valeurs pour cette tranche
+        prod_time = agent_df.iloc[i]['prod_realise']
+        pause_time = agent_df.iloc[i]['Pause_realise']
+        total_realise = prod_time + pause_time
+        
+        # Récupérer les valeurs du planning pour cette tranche
+        lunch_planning = agent_df.iloc[i]['Lunch']
+        prod_planning = agent_df.iloc[i]['Prod']
+        pause_planning = agent_df.iloc[i]['Pause_planning']
+        
+        # CAS 1: Aucune activité réalisée (prod_realise et pause_realise sont zéro)
+        if total_realise == 0:
+            # Sous-cas 1.1: Si un lunch était prévu, c'est un lunch
+            if lunch_planning > 0:
+                activity = "Déconnexion"  #"Déjeuner"
+                segment_color = deconnexion_color
+            # Sous-cas 1.2: Si une production ou pause était prévue, c'est une déconnexion
+            elif prod_planning > 0 or pause_planning > 0:
+                activity = "Déconnexion"
+                segment_color = deconnexion_color
+            # Sous-cas 1.3: Si rien n'était prévu non plus
+            else:
+                activity = "Non défini"
+                segment_color = "#F7F7F7"  # Gris clair
+            
+            # Ajouter le segment complet
+            fig.add_shape(
+                type="rect",
+                x0=x0, y0=0,
+                x1=x1, y1=1,
+                fillcolor=segment_color,
+                line=dict(width=0),
+                opacity=0.9,
+                row=2, col=1
+            )
+            
+            # Tooltip pour le segment
+            fig.add_trace(
+                go.Scatter(
+                    x=[(x0 + x1) / 2],
+                    y=[0.5],
+                    mode="markers",
+                    marker=dict(size=0, color="rgba(0,0,0,0)"),
+                    hoverinfo="text",
+                    text=f"Tranche: {tranche}<br>Activité: {activity}",
+                    showlegend=False
+                ),
+                row=2, col=1
+            )
+        
+        # CAS 2: Activités réalisées (production et/ou pause)
+        else:
+            segment_width = x1 - x0
+            
+            # 2.1. Partie production (si existante)
+            if prod_time > 0:
+                prod_proportion = prod_time / 900  # 900 secondes = 15 minutes
+                prod_width = segment_width * prod_proportion
+                
+                fig.add_shape(
+                    type="rect",
+                    x0=x0, y0=0,
+                    x1=x0 + prod_width, y1=1,
+                    fillcolor=prod_color,
+                    line=dict(width=0),
+                    opacity=0.9,
+                    row=2, col=1
+                )
+                
+                # Tooltip pour la production
+                fig.add_trace(
+                    go.Scatter(
+                        x=[x0 + prod_width/2],
+                        y=[0.5],
+                        mode="markers",
+                        marker=dict(size=0, color="rgba(0,0,0,0)"),
+                        hoverinfo="text",
+                        text=f"Tranche: {tranche}<br>Production: {int(prod_time/60)} min {int(prod_time%60)} sec",
+                        showlegend=False
+                    ),
+                    row=2, col=1
+                )
+            
+            # 2.2. Partie pause (si existante)
+            if pause_time > 0:
+                pause_proportion = pause_time / 900
+                pause_width = segment_width * pause_proportion
+                pause_start = x0 + (prod_time / 900) * segment_width
+                
+                fig.add_shape(
+                    type="rect",
+                    x0=pause_start, y0=0,
+                    x1=pause_start + pause_width, y1=1,
+                    fillcolor=pause_color,
+                    line=dict(width=0),
+                    opacity=0.9,
+                    row=2, col=1
+                )
+                
+                # Tooltip pour la pause
+                fig.add_trace(
+                    go.Scatter(
+                        x=[pause_start + pause_width/2],
+                        y=[0.5],
+                        mode="markers",
+                        marker=dict(size=0, color="rgba(0,0,0,0)"),
+                        hoverinfo="text",
+                        text=f"Tranche: {tranche}<br>Pause: {int(pause_time/60)} min {int(pause_time%60)} sec",
+                        showlegend=False
+                    ),
+                    row=2, col=1
+                )
+            
+            # 2.3. Partie restante (non utilisée)
+            remaining_time = 900 - total_realise
+            if remaining_time > 0:
+                remaining_proportion = remaining_time / 900
+                remaining_width = segment_width * remaining_proportion
+                remaining_start = x0 + (total_realise / 900) * segment_width
+                
+                # Déterminer la couleur pour le temps restant
+                if lunch_planning > 0:
+                    remaining_color = deconnexion_color #lunch_color
+                    remaining_activity = "Déconnexion" #"Déjeuner"
+                else:
+                    remaining_color = deconnexion_color
+                    remaining_activity = "Déconnexion"
+                
+                fig.add_shape(
+                    type="rect",
+                    x0=remaining_start, y0=0,
+                    x1=remaining_start + remaining_width, y1=1,
+                    fillcolor=remaining_color,
+                    line=dict(width=0),
+                    opacity=0.9,
+                    row=2, col=1
+                )
+                
+                # Tooltip pour le temps restant
+                fig.add_trace(
+                    go.Scatter(
+                        x=[remaining_start + remaining_width/2],
+                        y=[0.5],
+                        mode="markers",
+                        marker=dict(size=0, color="rgba(0,0,0,0)"),
+                        hoverinfo="text",
+                        text=f"Tranche: {tranche}<br>{remaining_activity}: {int(remaining_time/60)} min {int(remaining_time%60)} sec",
+                        showlegend=False
+                    ),
+                    row=2, col=1
+                )
     
     # Ajouter les rectangles pour ADHÉRENCE
     for segment in adh_data:
@@ -1231,6 +1430,7 @@ def create_agent_plot(agent_df):
     )
     
     return fig
+
 # Affichage dans Streamlit
 if date_selected:
     # Légende avec design moderne
@@ -1249,6 +1449,10 @@ if date_selected:
             <div class="legend-label">Déjeuner</div>
         </div>
         <div class="legend-item">
+            <div class="legend-color" style="background-color: #d32f2f;"></div>
+            <div class="legend-label">Déconnexion</div>
+        </div>
+        <div class="legend-item">
             <div class="legend-color" style="background-color: #4caf50;"></div>
             <div class="legend-label">Adhérence ≥ 90%</div>
         </div>
@@ -1260,7 +1464,14 @@ if date_selected:
     """, unsafe_allow_html=True)
     
     # Appliquer les filtres aux données filtrées par date
-    filtered_df = apply_filters(df, selected_files, selected_tlss, selected_ops)
+    filtered_df = apply_filters(
+        df, 
+        selected_files, 
+        selected_tlss, 
+        selected_ops,
+        min_adherence,
+        max_adherence
+    )
     
     # Afficher le nombre d'agents après filtrage
     if not filtered_df.empty:
@@ -1276,6 +1487,8 @@ if date_selected:
             filter_info.append(f"TLS: {', '.join(selected_tlss)}")
         if selected_ops:
             filter_info.append(f"OPS: {', '.join(selected_ops)}")
+        if min_adherence > 0 or max_adherence < 100:
+            filter_info.append(f"Adhérence: {min_adherence}% - {max_adherence}%")
         
         # Résumé des filtres avec badge du nombre d'agents
         st.markdown(f"""
@@ -1288,9 +1501,10 @@ if date_selected:
         """, unsafe_allow_html=True)
         
         # Afficher la liste des agents avec un style amélioré
-        st.markdown("## Adhérence par agent")
+        st.markdown("## Adhérence des agent")
         
         # Séparateur entre agents
+       # Séparateur entre agents
         for i, agent_name in enumerate(filtered_df['Nom Agent'].unique()):
             agent_data = filtered_df[filtered_df['Nom Agent'] == agent_name]
             
@@ -1300,6 +1514,13 @@ if date_selected:
             adherence_class = "high-adherence" if adherence_mean >= 90 else "low-adherence"
             adherence_color = "#4caf50" if adherence_mean >= 90 else "#f44336"
             
+            # AJOUT ICI: Calculer la durée totale de traitement
+            total_treatment_seconds = agent_data['Traitement'].apply(time_to_seconds).sum()
+            total_treatment_time = seconds_to_time(total_treatment_seconds)
+            
+            # Calculer le temps de traitement en heures avec décimales
+            treatment_hours = total_treatment_seconds / 3600
+            
             # Récupérer les métadonnées de l'agent
             file_name = agent_data['File'].iloc[0]
             tls_name = agent_data['Tls'].iloc[0]
@@ -1308,12 +1529,15 @@ if date_selected:
             # Créer le conteneur de l'agent avec colonnes et design amélioré
             with st.container():
                 cols = st.columns([2, 6, 1])
-                
-                # Colonne 1: Infos de l'agent
+        
+        # Colonne 1: Infos de l'agent - MODIFIÉE POUR INCLURE LA DURÉE TOTALE DE TRAITEMENT
                 with cols[0]:
                     st.markdown(f"""
                     <div style="padding: 15px; background-color: white; border-radius: 10px; height: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                         <div style="font-weight: 600; font-size: 16px; color: #212121; margin-bottom: 5px;">{agent_name}</div>
+                        <div style="font-weight: 500; font-size: 14px; color: #333; margin-bottom: 10px; padding: 5px; background-color: #f2f6ff; border-radius: 5px; border-left: 3px solid #1a73e8;">
+                            Temps de traitement: {total_treatment_time} 
+                        </div>
                         <div style="color: #757575; font-size: 13px; margin-top: 5px; display: flex; align-items: center;">
                             <div style="width: 8px; height: 8px; background-color: #1a73e8; border-radius: 50%; margin-right: 5px;"></div>
                             File: {file_name}
@@ -1328,7 +1552,7 @@ if date_selected:
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                
+                    
                 # Colonne 2: Visualisation du planning
                 with cols[1]:
                     fig = create_agent_plot(agent_data)
