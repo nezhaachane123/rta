@@ -412,7 +412,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Barre de navigation
-col1, col2, col3 = st.columns([1, 1, 1])
+col1, col2, col3, col4= st.columns([1, 1, 1,1])
 with col1:
     if st.button("📊 Dashboard"):
         st.switch_page("pages/Dashboard.py")
@@ -420,8 +420,13 @@ with col1:
 with col2:
     if st.button("📈 Real Time Adherence"):
         st.switch_page("pages/Real_Time_Adherence.py")
-        
+
 with col3:
+    if st.button("📊 Suivi de production"):
+        st.switch_page("pages/suivi_production.py")
+        
+        
+with col4:
     if st.button("🚪 Déconnexion"):
         st.session_state.logged_in = False
         st.session_state.username = ""
