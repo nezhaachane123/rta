@@ -559,6 +559,8 @@
 
 
 ###########################code final de dashboard#############################
+
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -755,7 +757,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Barre de navigation
-col1, col2, col3 = st.columns([1, 1, 1])
+col1, col2, col3,col4 = st.columns([1, 1, 1,1])
 with col1:
     if st.session_state.role == "admin" and st.button("👑 Administration"):
         st.switch_page("pages/Admin.py")
@@ -763,8 +765,12 @@ with col1:
 with col2:
     if st.button("📈 Real Time Adherence"):
         st.switch_page("pages/Real_Time_Adherence.py")
-        
+
 with col3:
+    if st.button("📊 Suivi de production"):
+        st.switch_page("pages/suivi_production.py")
+        
+with col4:
     if st.button("🚪 Déconnexion"):
         st.session_state.logged_in = False
         st.session_state.username = ""
@@ -1391,10 +1397,176 @@ else:
             st.plotly_chart(fig, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
-        
-        
-st.markdown('</div>', unsafe_allow_html=True)  # Fermeture du container principal
+    
+        # Quatrième ligne de graphiques (TLS et OPS)
+        graph_cols4 = st.columns(2)
 
+        with graph_cols4[0]:
+            # Graphique 7: Adhérence moyenne par TLS
+            st.markdown("---")
+            st.subheader("Adhérence par TLS")
+            
+            # Préparation des données
+            tls_agent_adherence = filtered_data.groupby(['Tls', 'Nom Agent'])['Adherence'].apply(
+                lambda x: x.str.rstrip('%').astype(float).mean()
+            ).reset_index()
+            
+            tls_adherence = tls_agent_adherence.groupby('Tls')['Adherence'].mean().reset_index()
+            tls_adherence.columns = ['Tls', 'Adhérence Moyenne']
+            
+            # Calcul du nombre d'agents par TLS (pour la taille des barres)
+            tls_agent_count = tls_agent_adherence.groupby('Tls')['Nom Agent'].nunique().reset_index()
+            tls_agent_count.columns = ['Tls', 'Nombre d\'agents']
+            
+            # Fusionner les données d'adhérence et de nombre d'agents
+            tls_data = pd.merge(tls_adherence, tls_agent_count, on='Tls')
+            
+            # Trier par adhérence décroissante
+            tls_data = tls_data.sort_values('Adhérence Moyenne', ascending=False)
+            
+            # Graphique avec style amélioré et taille des barres proportionnelle au nombre d'agents
+            fig = px.bar(
+                tls_data,
+                x='Tls',
+                y='Adhérence Moyenne',
+                text='Adhérence Moyenne',
+                color='Adhérence Moyenne',
+                color_continuous_scale=[(0, '#ff9800'), (0.5, '#8bc34a'), (1, '#4caf50')],
+                hover_data=['Nombre d\'agents'],  # Afficher le nombre d'agents au survol
+                width=800  # Largeur fixe pour s'assurer que les étiquettes sont visibles
+            )
+            
+            # Personnalisation du graphique
+            fig.update_layout(
+                title=None,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Poppins, sans-serif"),
+                margin=dict(l=10, r=10, t=10, b=10),
+                xaxis=dict(
+                    title="Team Leader",
+                    tickangle=45,  # Rotation des étiquettes pour éviter le chevauchement
+                    gridcolor='rgba(211,211,211,0.3)'
+                ),
+                yaxis=dict(
+                    title="Adhérence Moyenne (%)",
+                    range=[0, 100],
+                    gridcolor='rgba(211,211,211,0.3)'
+                ),
+                coloraxis_showscale=False
+            )
+            
+            # Formatage du texte et personnalisation des barres
+            fig.update_traces(
+                texttemplate='%{text:.2f}%', 
+                textposition='outside',
+                marker_line_width=0,
+                hovertemplate='<b>%{x}</b><br>Adhérence: %{y:.2f}%<br>Agents: %{customdata[0]}<extra></extra>'
+            )
+            
+            # Ligne d'objectif
+            fig.add_hline(
+                y=90, 
+                line_dash="dash", 
+                line_color="#4caf50",
+                annotation_text="Objectif 90%",
+                annotation_position="top right"
+            )
+            
+            # Afficher le graphique
+            st.plotly_chart(fig, use_container_width=True)
+            
+
+        with graph_cols4[1]:
+            # Graphique 8: Adhérence moyenne par OPS
+            st.markdown("---")
+            st.subheader("Adhérence par OPS")
+            
+            # Préparation des données
+            ops_agent_adherence = filtered_data.groupby(['OPS', 'Nom Agent'])['Adherence'].apply(
+                lambda x: x.str.rstrip('%').astype(float).mean()
+            ).reset_index()
+            
+            ops_adherence = ops_agent_adherence.groupby('OPS')['Adherence'].mean().reset_index()
+            ops_adherence.columns = ['OPS', 'Adhérence Moyenne']
+            
+            # Calcul du nombre d'agents par OPS (pour l'information au survol)
+            ops_agent_count = ops_agent_adherence.groupby('OPS')['Nom Agent'].nunique().reset_index()
+            ops_agent_count.columns = ['OPS', 'Nombre d\'agents']
+            
+            # Fusionner les données d'adhérence et de nombre d'agents
+            ops_data = pd.merge(ops_adherence, ops_agent_count, on='OPS')
+            
+            # Trier par adhérence décroissante
+            ops_data = ops_data.sort_values('Adhérence Moyenne', ascending=False)
+            
+            # Calculer l'écart par rapport à l'objectif
+            ops_data['Écart'] = ops_data['Adhérence Moyenne'] - 90
+            ops_data['Performance'] = ops_data['Écart'].apply(
+                lambda x: "Au-dessus de l'objectif" if x >= 0 else "En dessous de l'objectif"
+            )
+            
+            # Créer une palette de couleurs conditionnelles
+            color_discrete_map = {
+                "Au-dessus de l'objectif": '#4caf50',
+                "En dessous de l'objectif": '#ff9800'
+            }
+            
+            # Graphique avec style amélioré et couleurs conditionnelles
+            fig = px.bar(
+                ops_data,
+                x='OPS',
+                y='Adhérence Moyenne',
+                text='Adhérence Moyenne',
+                color='Performance',
+                color_discrete_map=color_discrete_map,
+                hover_data=['Nombre d\'agents', 'Écart'],
+                width=800
+            )
+            
+            # Personnalisation du graphique
+            fig.update_layout(
+                title=None,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Poppins, sans-serif"),
+                margin=dict(l=10, r=10, t=10, b=10),
+                xaxis=dict(
+                    title="Opérateur Superviseur",
+                    tickangle=45,
+                    gridcolor='rgba(211,211,211,0.3)'
+                ),
+                yaxis=dict(
+                    title="Adhérence Moyenne (%)",
+                    range=[0, 100],
+                    gridcolor='rgba(211,211,211,0.3)'
+                ),
+                legend_title=None
+            )
+            
+            # Formatage du texte et personnalisation des barres
+            fig.update_traces(
+                texttemplate='%{text:.2f}%', 
+                textposition='outside',
+                marker_line_width=0,
+                hovertemplate='<b>%{x}</b><br>Adhérence: %{y:.2f}%<br>Agents: %{customdata[0]}<br>Écart: %{customdata[1]:.2f}%<extra></extra>'
+            )
+            
+            # Ligne d'objectif
+            fig.add_hline(
+                y=90, 
+                line_dash="dash", 
+                line_color="#4caf50",
+                annotation_text="Objectif 90%",
+                annotation_position="top right"
+            )
+            
+            # Afficher le graphique
+            st.plotly_chart(fig, use_container_width=True)
+            
+    
+
+st.markdown('</div>', unsafe_allow_html=True)  # Fermeture du container principal
 
 
 
