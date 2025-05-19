@@ -1611,6 +1611,8 @@
 
 
 #####################################code final de rta ################################
+
+
 import streamlit as st
 import gspread
 import pandas as pd
@@ -1859,16 +1861,20 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Barre de navigation
-nav_cols = st.columns(3)
+nav_cols = st.columns(4)
 with nav_cols[0]:
     if st.button("📊 Dashboard"):
         st.switch_page("pages/Dashboard.py")
 
 with nav_cols[1]:
+    if st.button("📊 Suivi de production"):
+        st.switch_page("pages/suivi_production.py")
+
+with nav_cols[2]:
     if st.session_state.role == "admin" and st.button("👑 Administration"):
         st.switch_page("pages/Admin.py")
 
-with nav_cols[2]:
+with nav_cols[3]:
     if st.button("🚪 Déconnexion"):
         st.session_state.logged_in = False
         st.session_state.username = ""
@@ -2745,8 +2751,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)  # Fermeture du container principal
-
-
 
 
 
