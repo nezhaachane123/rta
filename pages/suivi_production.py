@@ -573,7 +573,7 @@ with st.spinner("Chargement des données depuis Google Sheets..."):
                         prod_nette_display = format_decimal(prod_nette)
                         
                         # Temps
-                        temps_presence = format_duration(employee.get("Temps de presence", ""))
+                        temps_presence = format_duration(employee.get("Temps de présence", ""))
                         temps_travail = format_duration(employee.get("Temps de travail", ""))
                         appel_entrant = format_duration(employee.get("Appel entrant", ""))
                         en_attente = format_duration(employee.get("Attente", ""))
