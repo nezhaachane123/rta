@@ -1861,7 +1861,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Barre de navigation
-nav_cols = st.columns(4)
+nav_cols = st.columns(6)
 with nav_cols[0]:
     if st.button("📊 Dashboard"):
         st.switch_page("pages/Dashboard.py")
@@ -1875,6 +1875,15 @@ with nav_cols[2]:
         st.switch_page("pages/Admin.py")
 
 with nav_cols[3]:
+    if st.button("📊 detection_anomalies"):
+        st.switch_page("pages/detection_anomalies.py")
+
+with nav_cols[4]:
+    if st.button("📊 predictions"):
+        st.switch_page("pages/predictions.py")
+
+
+with nav_cols[5]:
     if st.button("🚪 Déconnexion"):
         st.session_state.logged_in = False
         st.session_state.username = ""
@@ -2751,7 +2760,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)  # Fermeture du container principal
-
 
 
 
