@@ -561,6 +561,8 @@
 ###########################code final de dashboard#############################
 
 
+
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -757,7 +759,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Barre de navigation
-col1, col2, col3,col4 = st.columns([1, 1, 1,1])
+col1, col2, col3,col4,col5,col6= st.columns([1, 1, 1,1,1,1])
 with col1:
     if st.session_state.role == "admin" and st.button("👑 Administration"):
         st.switch_page("pages/Admin.py")
@@ -771,6 +773,15 @@ with col3:
         st.switch_page("pages/suivi_production.py")
         
 with col4:
+    if st.button("📊 detection_anomalies"):
+        st.switch_page("pages/detection_anomalies.py")
+
+with col5:
+    if st.button("📊 predictions"):
+        st.switch_page("pages/predictions.py")
+
+           
+with col6:
     if st.button("🚪 Déconnexion"):
         st.session_state.logged_in = False
         st.session_state.username = ""
@@ -1567,8 +1578,6 @@ else:
     
 
 st.markdown('</div>', unsafe_allow_html=True)  # Fermeture du container principal
-
-
 
 
 
